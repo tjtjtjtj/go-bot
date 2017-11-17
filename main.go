@@ -32,7 +32,7 @@ func main() {
 
 		case *slack.MessageEvent:
 			fmt.Printf("Message: %v\n", ev)
-			rtm.SendMessage(rtm.NewOutgoingMessage("pr", ev.Channel))
+			rtm.SendMessage(rtm.NewOutgoingMessage("PR", ev.Channel))
 			repos := ghe.Simple()
 			for _, r := range repos {
 				rtm.SendMessage(rtm.NewOutgoingMessage(r.Full_name, ev.Channel))

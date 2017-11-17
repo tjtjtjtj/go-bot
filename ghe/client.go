@@ -25,7 +25,7 @@ type Client struct {
 //func NewClient(urlStr, username, password string, logger *log.Logger) (*Client, error) {
 func NewClient(urlStr string) (*Client, error) {
 	c := new(Client)
-	//	c.URL = url.Parse(urlStr)
+	c.URL = url.Parse(urlStr)
 	c.HTTPClient = new(http.Client)
 
 	return c, nil
