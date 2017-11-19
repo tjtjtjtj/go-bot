@@ -1,11 +1,13 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"strings"
 
 	"github.com/nlopes/slack"
+	"github.com/tjtjtjtj/go-bot/ghe"
 )
 
 const (
@@ -13,24 +15,27 @@ const (
 	actionSelect = "select"
 	actionStart  = "start"
 	actionCancel = "cancel"
+
+	gheurl = "https://api.github.com"
 )
 
 type SlackListener struct {
 	client    *slack.Client
 	botID     string
 	channelID string
+	rtm       *slack.RTM
 }
 
 // LstenAndResponse listens slack events and response
 // particular messages. It replies by slack message button.
 func (s *SlackListener) ListenAndResponse() {
-	rtm := s.client.NewRTM()
+	s.rtm = s.client.NewRTM()
 
 	// Start listening slack events
-	go rtm.ManageConnection()
+	go s.rtm.ManageConnection()
 
 	// Handle slack events
-	for msg := range rtm.IncomingEvents {
+	for msg := range s.rtm.IncomingEvents {
 		switch ev := msg.Data.(type) {
 		case *slack.MessageEvent:
 			if err := s.handleMessageEvent(ev); err != nil {
@@ -43,29 +48,69 @@ func (s *SlackListener) ListenAndResponse() {
 // handleMesageEvent handles message events.
 func (s *SlackListener) handleMessageEvent(ev *slack.MessageEvent) error {
 	// Only response in specific channel. Ignore else.
+	log.Printf("channelid:%v", s.channelID)
+	log.Printf("botid:%v", s.botID)
+	log.Printf("channelid:%v", ev.Channel)
+	log.Printf("botid:%v", ev.BotID)
 	if ev.Channel != s.channelID {
 		log.Printf("%s %s", ev.Channel, ev.Msg.Text)
+		log.Println("ここまでchannelid")
 		return nil
 	}
 
 	// Only response mention to bot. Ignore else.
 	if !strings.HasPrefix(ev.Msg.Text, fmt.Sprintf("<@%s> ", s.botID)) {
+		log.Println("ここまでbotid")
 		return nil
 	}
 
 	// Parse message
 	m := strings.Split(strings.TrimSpace(ev.Msg.Text), " ")[1:]
-	if len(m) == 0 || m[0] != "hey" {
+	// todo:ここにぱーす後の文字列処理を入れる
+	log.Println("ここまでstart")
+	if len(m) == 0 {
+		// 何か言ってよと返す
+		log.Println("no m")
 		return fmt.Errorf("invalid message")
 	}
 
-	// value is passed to message handler when request is approved.
-	attachment := slack.Attachment{
-		Text:       "Which beer do you want? :beer:",
-		Color:      "#f9a41b",
-		CallbackID: "beer",
-		Actions: []slack.AttachmentAction{
-			{
+	//switch m[0]で角処理に分岐させる
+	switch m[0] {
+	case "ghe":
+		c, err := ghe.NewClient(gheurl)
+		if err != nil {
+			return err
+		}
+
+		log.Println("ここまで1")
+		ctx := context.Background()
+
+		switch m[1] {
+		case "pr":
+			log.Println("ここまで2")
+			repos, err := c.GetRepos(ctx, "tjtjtjtj")
+			if err != nil {
+				return err
+			}
+			for _, r := range repos {
+				log.Printf("repo:%s", r.Full_name)
+				s.rtm.SendMessage(s.rtm.NewOutgoingMessage(r.Full_name, "G1Q7ABZ8F"))
+			}
+		default:
+			log.Println("ここまで3")
+		}
+
+	default:
+		log.Println("ここまでend")
+	}
+	/*
+		// value is passed to message handler when request is approved.
+		attachment := slack.Attachment{
+			Text:       "Which beer do you want? :beer:",
+			Color:      "#f9a41b",
+			CallbackID: "beer",
+			Actions: []slack.AttachmentAction{
+				Text: "Which beer do you want? :beer:",
 				Name: actionSelect,
 				Type: "select",
 				Options: []slack.AttachmentActionOption{
@@ -98,18 +143,18 @@ func (s *SlackListener) handleMessageEvent(ev *slack.MessageEvent) error {
 				Type:  "button",
 				Style: "danger",
 			},
-		},
-	}
+		}
 
-	params := slack.PostMessageParameters{
-		Attachments: []slack.Attachment{
-			attachment,
-		},
-	}
+		params := slack.PostMessageParameters{
+			Attachments: []slack.Attachment{
+				attachment,
+			},
+		}
 
-	if _, _, err := s.client.PostMessage(ev.Channel, "", params); err != nil {
-		return fmt.Errorf("failed to post message: %s", err)
-	}
+		if _, _, err := s.client.PostMessage(ev.Channel, "", params); err != nil {
+			return fmt.Errorf("failed to post message: %s", err)
+		}
+	*/
 
 	return nil
 }

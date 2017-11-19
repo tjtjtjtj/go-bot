@@ -1,4 +1,4 @@
-package ghe
+/*package ghe
 
 import (
 	"encoding/json"
@@ -6,7 +6,6 @@ import (
 	"io/ioutil"
 	"net/http"
 )
-
 type Repo struct {
 	Full_name string `json:"full_name"`
 }
@@ -26,3 +25,4 @@ func Simple() []Repo {
 	}
 	return repos
 }
+*/

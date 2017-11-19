@@ -3,6 +3,7 @@ package ghe
 import (
 	"context"
 	"fmt"
+	"log"
 )
 
 type Repo struct {
@@ -10,7 +11,7 @@ type Repo struct {
 }
 
 func (c *Client) GetRepos(ctx context.Context, org string) ([]Repo, error) {
-	spath := fmt.Sprintf("/orgs/%s", org)
+	spath := fmt.Sprintf("/users/%s/repos", org)
 	req, err := c.newRequest(ctx, "GET", spath, nil)
 	if err != nil {
 		return nil, err
@@ -20,13 +21,16 @@ func (c *Client) GetRepos(ctx context.Context, org string) ([]Repo, error) {
 	if err != nil {
 		return nil, err
 	}
+	log.Printf("resどうなった: %v", res)
 
 	// Check status code here…
 
 	var repos []Repo
 	if err := decodeBody(res, &repos); err != nil {
 		return nil, err
+		log.Printf("decodeどうなった: %v", repos)
 	}
+	log.Printf("decodeうま: %v", repos)
 
-	return &user, nil
+	return repos, nil
 }

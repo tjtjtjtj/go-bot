@@ -3,12 +3,10 @@ package ghe
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"path"
-	"runtime"
 )
 
 type Client struct {
@@ -25,13 +23,13 @@ type Client struct {
 //func NewClient(urlStr, username, password string, logger *log.Logger) (*Client, error) {
 func NewClient(urlStr string) (*Client, error) {
 	c := new(Client)
-	c.URL = url.Parse(urlStr)
+	c.URL, _ = url.ParseRequestURI(urlStr)
 	c.HTTPClient = new(http.Client)
 
 	return c, nil
 }
 
-var userAgent = fmt.Sprintf("XXXGoClient/%s (%s)", version, runtime.Version())
+//var userAgent = fmt.Sprintf("XXXGoClient/%s (%s)", version, runtime.Version())
 
 func (c *Client) newRequest(ctx context.Context, method, spath string, body io.Reader) (*http.Request, error) {
 	u := *c.URL
@@ -44,9 +42,9 @@ func (c *Client) newRequest(ctx context.Context, method, spath string, body io.R
 
 	req = req.WithContext(ctx)
 
-	req.SetBasicAuth(c.Username, c.Password)
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Set("User-Agent", userAgent)
+	//	req.SetBasicAuth(c.Username, c.Password)
+	//	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	//	req.Header.Set("User-Agent", userAgent)
 
 	return req, nil
 }
