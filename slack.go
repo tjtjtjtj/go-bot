@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"time"
 
 	"github.com/nlopes/slack"
 	"github.com/tjtjtjtj/go-bot/ghe"
@@ -84,6 +85,8 @@ func (s *SlackListener) handleMessageEvent(ev *slack.MessageEvent) error {
 
 		log.Println("ここまで1")
 		ctx := context.Background()
+		ctx, cancel := context.WithTimeout(ctx, 5*time.Second) // 5秒後にキャンセル
+		defer cancel()
 
 		switch m[1] {
 		case "pr":
@@ -94,7 +97,20 @@ func (s *SlackListener) handleMessageEvent(ev *slack.MessageEvent) error {
 			}
 			for _, r := range repos {
 				log.Printf("repo:%s", r.Full_name)
-				s.rtm.SendMessage(s.rtm.NewOutgoingMessage(r.Full_name, "G1Q7ABZ8F"))
+				//s.rtm.SendMessage(s.rtm.NewOutgoingMessage(r.Full_name, s.channelID))
+
+				attachment := slack.Attachment{
+					Title:    "Test",
+					ImageURL: "https://www.google.com.tw/images/branding/googlelogo/2x/googlelogo_color_120x44dp.png",
+				}
+				params := slack.PostMessageParameters{
+					Username:    "Log Reporter",
+					Attachments: []slack.Attachment{attachment},
+				}
+
+				if _, _, err := s.client.PostMessage(ev.Channel, "", params); err != nil {
+					return fmt.Errorf("failed to post message: %s", err)
+				}
 			}
 		default:
 			log.Println("ここまで3")
