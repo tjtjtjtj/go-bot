@@ -49,19 +49,12 @@ func (s *SlackListener) ListenAndResponse() {
 // handleMesageEvent handles message events.
 func (s *SlackListener) handleMessageEvent(ev *slack.MessageEvent) error {
 	// Only response in specific channel. Ignore else.
-	log.Printf("channelid:%v", s.channelID)
-	log.Printf("botid:%v", s.botID)
-	log.Printf("channelid:%v", ev.Channel)
-	log.Printf("botid:%v", ev.BotID)
 	if ev.Channel != s.channelID {
-		log.Printf("%s %s", ev.Channel, ev.Msg.Text)
-		log.Println("ここまでchannelid")
 		return nil
 	}
 
 	// Only response mention to bot. Ignore else.
-	if !strings.HasPrefix(ev.Msg.Text, fmt.Sprintf("<@%s> ", s.botID)) {
-		log.Println("ここまでbotid")
+	if !strings.HasPrefix(ev.Msg.Text, fmt.Sprintf("<@%s>", s.botID)) {
 		return nil
 	}
 
@@ -70,7 +63,7 @@ func (s *SlackListener) handleMessageEvent(ev *slack.MessageEvent) error {
 	// todo:ここにぱーす後の文字列処理を入れる
 	log.Println("ここまでstart")
 	if len(m) == 0 {
-		// 何か言ってよと返す
+		s.rtm.SendMessage(s.rtm.NewOutgoingMessage("何か言ってよ", s.channelID))
 		log.Println("no m")
 		return fmt.Errorf("invalid message")
 	}
@@ -78,6 +71,11 @@ func (s *SlackListener) handleMessageEvent(ev *slack.MessageEvent) error {
 	//switch m[0]で角処理に分岐させる
 	switch m[0] {
 	case "ghe":
+		if len(m) == 1 {
+			s.rtm.SendMessage(s.rtm.NewOutgoingMessage("gheで何したい？", s.channelID))
+			return nil
+		}
+
 		c, err := ghe.NewClient(gheurl)
 		if err != nil {
 			return err
@@ -85,11 +83,12 @@ func (s *SlackListener) handleMessageEvent(ev *slack.MessageEvent) error {
 
 		log.Println("ここまで1")
 		ctx := context.Background()
-		ctx, cancel := context.WithTimeout(ctx, 5*time.Second) // 5秒後にキャンセル
+		ctx, cancel := context.WithTimeout(ctx, 20*time.Second) // 5秒後にキャンセル
 		defer cancel()
 
 		switch m[1] {
 		case "pr":
+			//ここpr の次に sreとかorg指定でもいいかも
 			log.Println("ここまで2")
 			repos, err := c.GetRepos(ctx, "tjtjtjtj")
 			if err != nil {
@@ -97,14 +96,28 @@ func (s *SlackListener) handleMessageEvent(ev *slack.MessageEvent) error {
 			}
 			for _, r := range repos {
 				log.Printf("repo:%s", r.Full_name)
-				//s.rtm.SendMessage(s.rtm.NewOutgoingMessage(r.Full_name, s.channelID))
+				pulls, err := c.GetPulls(ctx, "tjtjtjtj", r.Name)
+				if err != nil {
+					return err
+				}
+				if len(pulls) == 0 {
+					continue
+				}
+
+				attachmentfields := make([]slack.AttachmentField, 0)
+				for _, p := range pulls {
+					//ここfielsに埋める
+					attachmentfields = append(attachmentfields, slack.AttachmentField{r.Full_name, fmt.Sprint(p.Number), false})
+				}
 
 				attachment := slack.Attachment{
-					Title:    "Test",
-					ImageURL: "https://www.google.com.tw/images/branding/googlelogo/2x/googlelogo_color_120x44dp.png",
+					Title:     r.Full_name,
+					TitleLink: r.Html_url,
+					ThumbURL:  "https://assets-cdn.github.com/images/modules/open_graph/github-mark.png",
+					Fields:    attachmentfields,
 				}
 				params := slack.PostMessageParameters{
-					Username:    "Log Reporter",
+					Username:    "go-bot",
 					Attachments: []slack.Attachment{attachment},
 				}
 
@@ -119,58 +132,5 @@ func (s *SlackListener) handleMessageEvent(ev *slack.MessageEvent) error {
 	default:
 		log.Println("ここまでend")
 	}
-	/*
-		// value is passed to message handler when request is approved.
-		attachment := slack.Attachment{
-			Text:       "Which beer do you want? :beer:",
-			Color:      "#f9a41b",
-			CallbackID: "beer",
-			Actions: []slack.AttachmentAction{
-				Text: "Which beer do you want? :beer:",
-				Name: actionSelect,
-				Type: "select",
-				Options: []slack.AttachmentActionOption{
-					{
-						Text:  "Asahi Super Dry",
-						Value: "Asahi Super Dry",
-					},
-					{
-						Text:  "Kirin Lager Beer",
-						Value: "Kirin Lager Beer",
-					},
-					{
-						Text:  "Sapporo Black Label",
-						Value: "Sapporo Black Label",
-					},
-					{
-						Text:  "Suntory Malts",
-						Value: "Suntory Malts",
-					},
-					{
-						Text:  "Yona Yona Ale",
-						Value: "Yona Yona Ale",
-					},
-				},
-			},
-
-			{
-				Name:  actionCancel,
-				Text:  "Cancel",
-				Type:  "button",
-				Style: "danger",
-			},
-		}
-
-		params := slack.PostMessageParameters{
-			Attachments: []slack.Attachment{
-				attachment,
-			},
-		}
-
-		if _, _, err := s.client.PostMessage(ev.Channel, "", params); err != nil {
-			return fmt.Errorf("failed to post message: %s", err)
-		}
-	*/
-
 	return nil
 }

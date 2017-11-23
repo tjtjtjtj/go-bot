@@ -7,7 +7,9 @@ import (
 )
 
 type Repo struct {
+	Name      string `json:"name"`
 	Full_name string `json:"full_name"`
+	Html_url  string `json:"html_url"`
 }
 
 func (c *Client) GetRepos(ctx context.Context, org string) ([]Repo, error) {
