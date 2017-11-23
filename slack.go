@@ -106,7 +106,13 @@ func (s *SlackListener) handleMessageEvent(ev *slack.MessageEvent) error {
 
 				attachmentfields := make([]slack.AttachmentField, 0)
 				for _, p := range pulls {
-					//ここfielsに埋める
+					//ここfielsに埋める プルリクのリンクも
+					reviews, err := c.GetReviews(ctx, "tjtjtjtj", r.Name, fmt.Sprint(p.Number))
+					if err != nil {
+						return err
+					}
+					log.Printf("%v", reviews)
+
 					attachmentfields = append(attachmentfields, slack.AttachmentField{r.Full_name, fmt.Sprint(p.Number), false})
 				}
 
