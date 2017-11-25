@@ -4,17 +4,20 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/http"
+
+	"github.com/pkg/errors"
 )
 
 type Review struct {
 	User struct {
-		Login int `json:"login"`
+		Login string `json:"login"`
 	} `json:"user"`
 	State string `json:"state"`
 }
 
-func (c *Client) GetReviews(ctx context.Context, org, repo, number string) ([]Review, error) {
-	spath := fmt.Sprintf("/repos/%s/%s/pulls/%s/reviews", org, repo, number)
+func (c *Client) GetReviews(ctx context.Context, owner, repo, number string) ([]Review, error) {
+	spath := fmt.Sprintf("/repos/%s/%s/pulls/%s/reviews", owner, repo, number)
 	req, err := c.newRequest(ctx, "GET", spath, nil)
 	if err != nil {
 		return nil, err
@@ -26,7 +29,9 @@ func (c *Client) GetReviews(ctx context.Context, org, repo, number string) ([]Re
 	}
 	log.Printf("resどうなった: %v", res)
 
-	// Check status code here…
+	if res.StatusCode == http.StatusNotFound {
+		return nil, errors.Errorf("reviews(%s) NotFound", spath)
+	}
 
 	var reviews []Review
 	if err := decodeBody(res, &reviews); err != nil {

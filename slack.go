@@ -60,15 +60,11 @@ func (s *SlackListener) handleMessageEvent(ev *slack.MessageEvent) error {
 
 	// Parse message
 	m := strings.Split(strings.TrimSpace(ev.Msg.Text), " ")[1:]
-	// todo:ここにぱーす後の文字列処理を入れる
-	log.Println("ここまでstart")
 	if len(m) == 0 {
 		s.rtm.SendMessage(s.rtm.NewOutgoingMessage("何か言ってよ", s.channelID))
-		log.Println("no m")
 		return fmt.Errorf("invalid message")
 	}
 
-	//switch m[0]で角処理に分岐させる
 	switch m[0] {
 	case "ghe":
 		if len(m) == 1 {
@@ -81,22 +77,20 @@ func (s *SlackListener) handleMessageEvent(ev *slack.MessageEvent) error {
 			return err
 		}
 
-		log.Println("ここまで1")
-		ctx := context.Background()
-		ctx, cancel := context.WithTimeout(ctx, 20*time.Second) // 5秒後にキャンセル
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second) // 30秒後にキャンセル
 		defer cancel()
 
 		switch m[1] {
-		case "pr":
-			//ここpr の次に sreとかorg指定でもいいかも
-			log.Println("ここまで2")
-			repos, err := c.GetRepos(ctx, "tjtjtjtj")
+		case "pr-orgs":
+			fallthrough
+		case "pr-users":
+			repos, err := c.GetRepos(ctx, strings.TrimLeft(m[1], "pr-"), m[2])
 			if err != nil {
 				return err
 			}
 			for _, r := range repos {
 				log.Printf("repo:%s", r.Full_name)
-				pulls, err := c.GetPulls(ctx, "tjtjtjtj", r.Name)
+				pulls, err := c.GetPulls(ctx, r.Owner.Login, r.Name)
 				if err != nil {
 					return err
 				}
@@ -104,39 +98,49 @@ func (s *SlackListener) handleMessageEvent(ev *slack.MessageEvent) error {
 					continue
 				}
 
-				attachmentfields := make([]slack.AttachmentField, 0)
+				attachmentfields := make([]slack.AttachmentField, 2)
 				for _, p := range pulls {
-					//ここfielsに埋める プルリクのリンクも
-					reviews, err := c.GetReviews(ctx, "tjtjtjtj", r.Name, fmt.Sprint(p.Number))
+					reviews, err := c.GetReviews(ctx, p.Base.Repo.Owner.Login, p.Base.Repo.Name, fmt.Sprint(p.Number))
 					if err != nil {
 						return err
 					}
 					log.Printf("%v", reviews)
+					//ここでアサインとレビューの人の改行コード版の一覧を作
+					var assigneelist string
+					for _, a := range p.Assignees {
+						assigneelist = assigneelist + a.User + "\n"
+					}
+					attachmentfields[0] = slack.AttachmentField{"Assignees", assigneelist, true}
 
-					attachmentfields = append(attachmentfields, slack.AttachmentField{r.Full_name, fmt.Sprint(p.Number), false})
-				}
+					var reviewlist string
+					for _, r := range reviews {
+						reviewlist = reviewlist + r.User.Login + ":" + r.State + "\n"
+					}
+					attachmentfields[1] = slack.AttachmentField{"Reviews", reviewlist, true}
 
-				attachment := slack.Attachment{
-					Title:     r.Full_name,
-					TitleLink: r.Html_url,
-					ThumbURL:  "https://assets-cdn.github.com/images/modules/open_graph/github-mark.png",
-					Fields:    attachmentfields,
-				}
-				params := slack.PostMessageParameters{
-					Username:    "go-bot",
-					Attachments: []slack.Attachment{attachment},
-				}
+					attachment := slack.Attachment{
+						Color:      "#36a64f",
+						AuthorName: p.Base.Repo.Full_name,
+						AuthorLink: p.Base.Repo.Html_url,
+						Title:      p.Title,
+						TitleLink:  p.Html_url,
+						ThumbURL:   "https://assets-cdn.github.com/images/modules/open_graph/github-mark.png",
+						Fields:     attachmentfields,
+					}
+					params := slack.PostMessageParameters{
+						Username:    "go-bot",
+						Attachments: []slack.Attachment{attachment},
+					}
 
-				if _, _, err := s.client.PostMessage(ev.Channel, "", params); err != nil {
-					return fmt.Errorf("failed to post message: %s", err)
+					if _, _, err := s.client.PostMessage(ev.Channel, "", params); err != nil {
+						return fmt.Errorf("failed to post message: %s", err)
+					}
 				}
 			}
 		default:
-			log.Println("ここまで3")
 		}
 
 	default:
-		log.Println("ここまでend")
 	}
 	return nil
 }

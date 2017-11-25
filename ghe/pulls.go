@@ -3,17 +3,25 @@ package ghe
 import (
 	"context"
 	"fmt"
-	"log"
+	"net/http"
+
+	"github.com/pkg/errors"
 )
 
 type Pull struct {
-	Repo_name string
 	Html_url  string `json:"html_url"`
 	Number    int    `json:"number"`
+	Title     string `json:"title"`
+	Assignees []struct {
+		User string `json:"login"`
+	} `json:"assignees"`
+	Base struct {
+		Repo Repo `json:"repo"`
+	} `json:"base"`
 }
 
-func (c *Client) GetPulls(ctx context.Context, org, repo string) ([]Pull, error) {
-	spath := fmt.Sprintf("/repos/%s/%s/pulls", org, repo)
+func (c *Client) GetPulls(ctx context.Context, owner, repo string) ([]Pull, error) {
+	spath := fmt.Sprintf("/repos/%s/%s/pulls", owner, repo)
 	req, err := c.newRequest(ctx, "GET", spath, nil)
 	if err != nil {
 		return nil, err
@@ -23,16 +31,15 @@ func (c *Client) GetPulls(ctx context.Context, org, repo string) ([]Pull, error)
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("resどうなった: %v", res)
 
-	// Check status code here…
+	if res.StatusCode == http.StatusNotFound {
+		return nil, errors.Errorf("pulls(%s) NotFound", spath)
+	}
 
 	var pulls []Pull
 	if err := decodeBody(res, &pulls); err != nil {
 		return nil, err
-		log.Printf("decodeどうなった: %v", pulls)
 	}
-	log.Printf("decodeうま: %v", pulls)
 
 	return pulls, nil
 }

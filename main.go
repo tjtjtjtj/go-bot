@@ -21,6 +21,9 @@ type envConfig struct {
 	// ChannelID is slack channel ID where bot is working.
 	// Bot responses to the mention in this channel.
 	ChannelID string `envconfig:"CHANNEL_ID" required:"true"`
+
+	// GHEToken is bot user token to access to GHE API.
+	GHEToken string `envconfig:"GHE_TOKEN" required:"false"`
 }
 
 func main() {
