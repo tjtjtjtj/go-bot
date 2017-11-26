@@ -12,11 +12,6 @@ import (
 )
 
 const (
-	// action is used for slack attament action.
-	actionSelect = "select"
-	actionStart  = "start"
-	actionCancel = "cancel"
-
 	gheurl = "https://api.github.com"
 )
 
@@ -27,15 +22,12 @@ type SlackListener struct {
 	rtm       *slack.RTM
 }
 
-// LstenAndResponse listens slack events and response
-// particular messages. It replies by slack message button.
+// LstenAndResponse listens slack events and response particular messages.
 func (s *SlackListener) ListenAndResponse() {
 	s.rtm = s.client.NewRTM()
 
-	// Start listening slack events
 	go s.rtm.ManageConnection()
 
-	// Handle slack events
 	for msg := range s.rtm.IncomingEvents {
 		switch ev := msg.Data.(type) {
 		case *slack.MessageEvent:
@@ -62,7 +54,7 @@ func (s *SlackListener) handleMessageEvent(ev *slack.MessageEvent) error {
 	m := strings.Split(strings.TrimSpace(ev.Msg.Text), " ")[1:]
 	if len(m) == 0 {
 		s.rtm.SendMessage(s.rtm.NewOutgoingMessage("何か言ってよ", s.channelID))
-		return fmt.Errorf("invalid message")
+		return nil
 	}
 
 	switch m[0] {
@@ -72,7 +64,7 @@ func (s *SlackListener) handleMessageEvent(ev *slack.MessageEvent) error {
 			return nil
 		}
 
-		c, err := ghe.NewClient(gheurl)
+		c, err := ghe.NewClient(gheurl, env.GHEToken)
 		if err != nil {
 			return err
 		}
@@ -104,8 +96,7 @@ func (s *SlackListener) handleMessageEvent(ev *slack.MessageEvent) error {
 					if err != nil {
 						return err
 					}
-					log.Printf("%v", reviews)
-					//ここでアサインとレビューの人の改行コード版の一覧を作
+
 					var assigneelist string
 					for _, a := range p.Assignees {
 						assigneelist = assigneelist + a.User + "\n"
@@ -119,7 +110,7 @@ func (s *SlackListener) handleMessageEvent(ev *slack.MessageEvent) error {
 					attachmentfields[1] = slack.AttachmentField{"Reviews", reviewlist, true}
 
 					attachment := slack.Attachment{
-						Color:      "#36a64f",
+						Color:      "#33bbff",
 						AuthorName: p.Base.Repo.Full_name,
 						AuthorLink: p.Base.Repo.Html_url,
 						Title:      p.Title,
@@ -138,9 +129,11 @@ func (s *SlackListener) handleMessageEvent(ev *slack.MessageEvent) error {
 				}
 			}
 		default:
+			s.rtm.SendMessage(s.rtm.NewOutgoingMessage("gheでその機能ないです", s.channelID))
 		}
 
 	default:
+		s.rtm.SendMessage(s.rtm.NewOutgoingMessage("I don't understand", s.channelID))
 	}
 	return nil
 }

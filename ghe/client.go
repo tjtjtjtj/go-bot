@@ -14,22 +14,20 @@ type Client struct {
 	HTTPClient *http.Client
 
 	Token string
-
-	//Username, Password string
-
-	//Logger *log.Logger
 }
 
-//func NewClient(urlStr, username, password string, logger *log.Logger) (*Client, error) {
-func NewClient(urlStr string) (*Client, error) {
+func NewClient(urlStr, token string) (*Client, error) {
 	c := new(Client)
-	c.URL, _ = url.ParseRequestURI(urlStr)
+	var err error
+	c.URL, err = url.ParseRequestURI(urlStr)
+	if err != nil {
+		return nil, err
+	}
+	c.Token = token
 	c.HTTPClient = new(http.Client)
 
 	return c, nil
 }
-
-//var userAgent = fmt.Sprintf("XXXGoClient/%s (%s)", version, runtime.Version())
 
 func (c *Client) newRequest(ctx context.Context, method, spath string, body io.Reader) (*http.Request, error) {
 	u := *c.URL
@@ -42,9 +40,9 @@ func (c *Client) newRequest(ctx context.Context, method, spath string, body io.R
 
 	req = req.WithContext(ctx)
 
-	//	req.SetBasicAuth(c.Username, c.Password)
-	//	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	//	req.Header.Set("User-Agent", userAgent)
+	if len(c.Token) != 0 {
+		req.Header.Set("Authorization", "token "+c.Token)
+	}
 
 	return req, nil
 }

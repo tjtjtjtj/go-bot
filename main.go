@@ -26,12 +26,13 @@ type envConfig struct {
 	GHEToken string `envconfig:"GHE_TOKEN" required:"false"`
 }
 
+var env envConfig
+
 func main() {
 	os.Exit(_main(os.Args[1:]))
 }
 
 func _main(args []string) int {
-	var env envConfig
 	if err := envconfig.Process("", &env); err != nil {
 		log.Printf("[ERROR] Failed to process env var: %s", err)
 		return 1
