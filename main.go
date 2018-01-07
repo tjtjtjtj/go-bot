@@ -3,9 +3,11 @@ package main
 import (
 	"log"
 	"os"
+	"os/signal"
 
 	"github.com/kelseyhightower/envconfig"
 	"github.com/nlopes/slack"
+	"gopkg.in/robfig/cron.v2"
 )
 
 // https://api.slack.com/slack-apps
@@ -24,6 +26,12 @@ type envConfig struct {
 
 	// GHEToken is bot user token to access to GHE API.
 	GHEToken string `envconfig:"GHE_TOKEN" required:"false"`
+
+	// ZabbixUser is user to access to Zabbix API.
+	ZabbixUser string `envconfig:"ZABBIX_USER" required:"false"`
+
+	// ZabbixPasswd is password for zabbix user.
+	ZabbixPasswd string `envconfig:"ZABBIX_PASSWD" required:"false"`
 }
 
 var env envConfig
@@ -49,7 +57,17 @@ func _main(args []string) int {
 		channelID: env.ChannelID,
 	}
 
-	slackListener.ListenAndResponse()
+	go slackListener.ListenAndResponse()
+
+	c := cron.New()
+	if _, err := c.AddJob("0 30 * * * *", slackListener); err != nil {
+		log.Printf("[ERROR] Failed to AddJob: %s", err)
+		return 1
+	}
+	c.Start()
+	sig := make(chan os.Signal)
+	signal.Notify(sig, os.Interrupt, os.Kill)
+	<-sig
 
 	return 0
 }

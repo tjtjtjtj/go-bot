@@ -4,15 +4,18 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/nlopes/slack"
 	"github.com/tjtjtjtj/go-bot/ghe"
+	"github.com/tjtjtjtj/go-bot/zabbix"
 )
 
 const (
-	gheurl = "https://api.github.com"
+	gheurl    = "https://api.github.com"
+	zabbixurl = "http://192.168.20.41/zabbix/api_jsonrpc.php"
 )
 
 type SlackListener struct {
@@ -29,6 +32,7 @@ func (s *SlackListener) ListenAndResponse() {
 	go s.rtm.ManageConnection()
 
 	for msg := range s.rtm.IncomingEvents {
+		log.Println(msg)
 		switch ev := msg.Data.(type) {
 		case *slack.MessageEvent:
 			if err := s.handleMessageEvent(ev); err != nil {
@@ -131,9 +135,56 @@ func (s *SlackListener) handleMessageEvent(ev *slack.MessageEvent) error {
 		default:
 			s.rtm.SendMessage(s.rtm.NewOutgoingMessage("gheでその機能ないです", s.channelID))
 		}
+	case "zabbix":
+		if len(m) == 1 {
+			s.rtm.SendMessage(s.rtm.NewOutgoingMessage("zabbixで何したい？", s.channelID))
+			return nil
+		}
+
+		c, err := zabbix.NewClient(zabbixurl)
+		if err != nil {
+			return err
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second) // 30秒後にキャンセル
+		defer cancel()
+		// todo: convert pass user to env
+		if err := c.Login(ctx, env.ZabbixUser, env.ZabbixPasswd); err != nil {
+			return err
+		}
+		log.Printf("auth:%s", c.Auth)
+
+		switch m[1] {
+		case "1":
+			fallthrough
+		case "tracmaxqps":
+			loc, _ := time.LoadLocation("Asia/Tokyo")
+			date := time.Now().Add(-24 * time.Hour).UTC().In(loc).Format("2006-01-02")
+			log.Println(date)
+			if len(m) >= 3 {
+				date = m[2]
+			}
+			h, err := c.HistoryGet(ctx, date)
+			if err != nil {
+				return err
+			}
+			n, _ := strconv.ParseInt(h.Clock, 10, 64)
+			t := time.Unix(n, 0).In(loc).Format(time.RFC3339)
+			log.Println(t)
+			s.rtm.SendMessage(s.rtm.NewOutgoingMessage(fmt.Sprintf("tracking maxqps:%s date:%s", h.Value, t), s.channelID))
+
+		default:
+			s.rtm.SendMessage(s.rtm.NewOutgoingMessage("zabbixでその機能ないです", s.channelID))
+		}
 
 	default:
 		s.rtm.SendMessage(s.rtm.NewOutgoingMessage("I don't understand", s.channelID))
 	}
 	return nil
+}
+
+func (s *SlackListener) Run() {
+	params := slack.PostMessageParameters{}
+	s.client.PostMessage(s.channelID, fmt.Sprintf("<@%s> ghe pr-users tjtjtjtj", s.botID), params)
+	s.client.PostMessage(s.channelID, fmt.Sprintf("<@%s> zabbix 1", s.botID), params)
 }
